@@ -50,11 +50,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/owen-lacey/ortools-wasm.git"
+    "url": "git+https://github.com/owen-lacey/cpsat-js.git"
   },
-  "homepage": "https://github.com/owen-lacey/ortools-wasm#readme",
+  "homepage": "https://github.com/owen-lacey/cpsat-js#readme",
   "bugs": {
-    "url": "https://github.com/owen-lacey/ortools-wasm/issues"
+    "url": "https://github.com/owen-lacey/cpsat-js/issues"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.3.0"
