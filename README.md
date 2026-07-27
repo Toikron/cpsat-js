@@ -8,6 +8,43 @@ WebAssembly port of Google OR-Tools' CP-SAT constraint programming solver. Runs 
 npm install cpsat-js
 ```
 
+## Build variants (threaded / portable)
+
+The package ships **two compiled binaries** and picks one automatically:
+
+| environment | variant | threads | needs `SharedArrayBuffer` |
+|---|---|---|---|
+| Node.js | threaded | yes (8 by default) | yes — always available in Node |
+| browsers, Deno, Bun, edge | portable | no | no |
+
+CP-SAT gets most of its speed from a **parallel subsolver portfolio**, so the threaded
+build is dramatically faster — on a 512-variable model, 431ms vs 4,065ms for the same
+proven-optimal answer.
+
+`import { CpSolver } from 'cpsat-js'` resolves correctly on its own via conditional
+exports, so most users need do nothing. Override explicitly if you need to:
+
+```ts
+import { CpSolver } from 'cpsat-js/threaded';  // requires SharedArrayBuffer
+import { CpSolver } from 'cpsat-js/portable';  // works anywhere
+```
+
+### Using the threaded build in a browser
+
+The threaded binary allocates shared WASM memory, which requires `SharedArrayBuffer`,
+which browsers only expose to [cross-origin isolated](https://web.dev/articles/cross-origin-isolation-guide)
+pages. Serve your page with:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Then import `cpsat-js/threaded` explicitly — the default `browser` condition
+deliberately resolves to the portable build, since most pages are not isolated. Note
+that these headers block embedding cross-origin resources that don't send CORP/CORS
+headers, so they are a deployment-wide decision.
+
 ## Using with Vite
 
 Add `cpsat-js` to `optimizeDeps.exclude` in your `vite.config.ts`:
@@ -20,7 +57,7 @@ export default defineConfig({
 });
 ```
 
-Without this, Vite's dep pre-bundler (esbuild) copies the package into `node_modules/.vite/deps/` and breaks the relative `new URL('../../build/cpsat.wasm', import.meta.url)` lookup — the dev server then returns the SPA HTML fallback for the WASM request, and Emscripten fails with `CompileError: expected magic word 00 61 73 6d, found 3c 21 64 6f` (`<!do`... from the HTML). Excluding the package routes it through Vite's main asset pipeline, which rewrites the URL correctly. Production builds (`vite build`) don't use the pre-bundler and work without this flag, but it's harmless to set in both.
+Without this, Vite's dep pre-bundler (esbuild) copies the package into `node_modules/.vite/deps/` and breaks the relative `new URL('../build/portable/cpsat.wasm', import.meta.url)` lookup — the dev server then returns the SPA HTML fallback for the WASM request, and Emscripten fails with `CompileError: expected magic word 00 61 73 6d, found 3c 21 64 6f` (`<!do`... from the HTML). Excluding the package routes it through Vite's main asset pipeline, which rewrites the URL correctly. Production builds (`vite build`) don't use the pre-bundler and work without this flag, but it's harmless to set in both.
 
 ## Quick Start
 
@@ -138,8 +175,22 @@ Expression building methods:
 
 ### `CpSolver`
 
-- `static create(options?): Promise<CpSolver>` — async factory that loads WASM
+- `static create(options?): Promise<CpSolver>` — async factory that loads WASM. The
+  6MB binary is fetched lazily here, not at import.
 - `solve(model, params?): CpSolverResult`
+
+#### `SolverParams`
+
+- `maxTimeInSeconds?: number` — wall-clock limit. On timeout you get `FEASIBLE` (best
+  solution found) or `UNKNOWN` (none found yet), never a throw.
+- `numWorkers?: number` — parallel subsolvers, default `8`.
+
+> **Use `1` or `>= 6`, never in between.** `num_workers` selects *which* subsolver
+> portfolio CP-SAT runs, not just how much parallelism it gets. Below 6 it runs a
+> degraded subset: on a representative model, 2 workers took 13.9s and 4 workers 38.4s
+> where **1 worker took 7.7s and 8 workers took 0.4s**. The gain is portfolio
+> composition rather than parallelism, so 8 workers is worth setting even on a single
+> core. The portable build has no threads and clamps this to 1 automatically.
 
 ### `CpSolverResult`
 
@@ -164,9 +215,17 @@ Requires CMake 3.18+, Ninja, and Emscripten.
 ```bash
 npm install
 npm run build:proto    # Generate TS types from .proto
-npm run build:wasm     # Compile CP-SAT to WASM (slow: ~20min first time)
+npm run build:wasm     # Compile both WASM variants (slow: ~40min first time)
 npm run build:ts       # Compile TypeScript
 npm test               # Run unit + integration tests
+```
+
+`build:wasm` builds both variants, because `-pthread` changes codegen across the whole
+OR-Tools/abseil/protobuf tree and they therefore need separate build trees. To iterate
+on just one:
+
+```bash
+./build.sh threaded    # or: portable, both (default)
 ```
 
 ## License

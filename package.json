@@ -1,21 +1,32 @@
 {
   "name": "cpsat-js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "WebAssembly port of Google OR-Tools CP-SAT constraint programming solver",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/index.portable.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/index.portable.js",
+      "node": "./dist/index.threaded.js",
+      "default": "./dist/index.portable.js"
     },
-    "./cpsat.wasm": "./build/cpsat.wasm"
+    "./threaded": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.threaded.js"
+    },
+    "./portable": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.portable.js"
+    }
   },
   "files": [
     "dist/",
-    "build/cpsat.mjs",
-    "build/cpsat.wasm"
+    "build/threaded/cpsat.mjs",
+    "build/threaded/cpsat.wasm",
+    "build/portable/cpsat.mjs",
+    "build/portable/cpsat.wasm"
   ],
   "scripts": {
     "build:wasm": "./build.sh",

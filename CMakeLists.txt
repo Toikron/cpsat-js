@@ -6,6 +6,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# ── Threading ──
+# CP-SAT's performance comes from its parallel subsolver portfolio, which needs
+# num_workers >= 6 to engage (below that it is slower than a single worker). The
+# threaded build is 15x faster, but requires SharedArrayBuffer at runtime — available
+# unconditionally in Node, but in browsers only under cross-origin isolation. Hence
+# two variants; see the "exports" map in package.json.
+#
+# These flags must be set globally and BEFORE FetchContent_MakeAvailable(or-tools) so
+# that OR-Tools, abseil and protobuf are all compiled with the same threading ABI as
+# the entry point. That is also why the two variants need separate build trees rather
+# than two targets in one.
+option(CPSAT_THREADS "Build with pthreads (requires SharedArrayBuffer at runtime)" ON)
+
+if(EMSCRIPTEN AND CPSAT_THREADS)
+  add_compile_options(-pthread)
+  add_link_options(-pthread)
+endif()
+
 # ── OR-Tools configuration: disable everything except CP-SAT core ──
 set(BUILD_DEPS ON CACHE BOOL "" FORCE)
 set(BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
@@ -59,9 +77,27 @@ if(EMSCRIPTEN)
     "SHELL:-s EXPORT_NAME='createCpSatModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s STACK_SIZE=4194304"
-    "SHELL:-s INITIAL_MEMORY=67108864"
     "SHELL:-s EXPORTED_FUNCTIONS=['_solve','_get_result_ptr','_free_result','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8']"
-    "SHELL:-s ENVIRONMENT='web,node'"
   )
+
+  if(CPSAT_THREADS)
+    target_link_options(cpsat_wasm PRIVATE
+      # Pre-spawn the pthread pool. CP-SAT creates its portfolio synchronously from
+      # inside solve() and never yields to the JS event loop, so threads cannot be
+      # spawned on demand — without a pre-allocated pool the call deadlocks. Sized
+      # above the default num_workers (8) to cover CP-SAT's auxiliary threads.
+      "SHELL:-s PTHREAD_POOL_SIZE=10"
+      "SHELL:-s PTHREAD_POOL_SIZE_STRICT=0"
+      "SHELL:-s DEFAULT_PTHREAD_STACK_SIZE=4194304"
+      # Measured peak during solving is ~139MB; growth is the safety net above that.
+      "SHELL:-s INITIAL_MEMORY=134217728"
+      "SHELL:-s ENVIRONMENT='web,node,worker'"
+    )
+  else()
+    target_link_options(cpsat_wasm PRIVATE
+      "SHELL:-s INITIAL_MEMORY=67108864"
+      "SHELL:-s ENVIRONMENT='web,node'"
+    )
+  endif()
 endif()

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { CpModel, CpSolver, CpSolverStatus } from '../../src/index.js';
+import { CpModel, CpSolver, CpSolverStatus } from '../../src/index.threaded.js';
 
 describe('N-Queens Problem', () => {
   let solver: CpSolver;
