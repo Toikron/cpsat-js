@@ -77,7 +77,7 @@ if(EMSCRIPTEN)
     "SHELL:-s EXPORT_NAME='createCpSatModule'"
     "SHELL:-s ALLOW_MEMORY_GROWTH=1"
     "SHELL:-s STACK_SIZE=4194304"
-    "SHELL:-s EXPORTED_FUNCTIONS=['_solve','_get_result_ptr','_free_result','_malloc','_free']"
+    "SHELL:-s EXPORTED_FUNCTIONS=['_solve','_get_result_ptr','_free_result','_solution_count','_solution_ptr','_solution_len','_malloc','_free']"
     "SHELL:-s EXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPU8']"
   )
 

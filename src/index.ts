@@ -1,6 +1,11 @@
 export { CpModel } from './model/cp-model.js';
 export { CpSolver, CpSolverStatus } from './solver/cp-solver.js';
-export type { CpSolverResult, CpSolverOptions, SolverParams } from './solver/cp-solver.js';
+export type {
+  CpSolverResult,
+  CpSolverSolution,
+  CpSolverOptions,
+  SolverParams,
+} from './solver/cp-solver.js';
 export { IntVar, BoolVar } from './model/int-var.js';
 export type { LinearExprLike } from './model/int-var.js';
 export { IntervalVar } from './model/interval-var.js';

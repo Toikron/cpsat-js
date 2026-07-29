@@ -19,12 +19,23 @@ export interface CpSolverOptions {
 }
 
 interface CpSatModule {
-  _solve(modelPtr: number, modelLen: number, paramsPtr: number, paramsLen: number): number;
+  _solve(
+    modelPtr: number,
+    modelLen: number,
+    paramsPtr: number,
+    paramsLen: number,
+    observe: number,
+  ): number;
   _get_result_ptr(): number;
   _free_result(): void;
+  _solution_count(): number;
+  _solution_ptr(index: number): number;
+  _solution_len(index: number): number;
   _malloc(size: number): number;
   _free(ptr: number): void;
   HEAPU8: Uint8Array;
+  /** Where the C++ observer reaches for a live callback. Set only during a solve. */
+  __cpsatOnSolution?: (bytes: Uint8Array) => void;
 }
 
 export type WasmFactory = (options?: Record<string, unknown>) => Promise<CpSatModule>;
@@ -58,6 +69,24 @@ export interface SolverParams {
    * than 1 on real models. Use 1 or >= 6, never in between.
    */
   numWorkers?: number;
+  /**
+   * Called for each improving solution the search finds.
+   *
+   * Purely observational: the return value is ignored and nothing here can steer or
+   * stop the search. Use `maxTimeInSeconds` to bound it.
+   *
+   * **When the calls arrive depends on `numWorkers`.** At 1 worker CP-SAT solves on
+   * the calling thread, so these are live — they interleave with the search, and
+   * `solve()` has not returned yet. Above 1 worker the search runs on threads that
+   * cannot enter JS, so incumbents are recorded and replayed in order just before
+   * `solve()` returns. `live` on each solution says which happened. The sequence and
+   * its contents are the same either way; only the timing differs.
+   *
+   * At 1 worker the handler runs inside the solver, holding a lock: keep it quick,
+   * and do not call back into the solver from it. Post the solution somewhere and
+   * return.
+   */
+  onSolution?: (solution: CpSolverSolution) => void;
 }
 
 export interface CpSolverResult {
@@ -69,6 +98,31 @@ export interface CpSolverResult {
   value(variable: IntVar): number;
   /** Raw response proto */
   response: CpSolverResponse;
+}
+
+/**
+ * One improving solution seen during the search.
+ *
+ * The same shape as a final result — including `value()` — so an incumbent and an
+ * answer can be read by the same code.
+ */
+export interface CpSolverSolution extends CpSolverResult {
+  /** Delivered mid-solve (1 worker), or replayed just before solve() returned. */
+  live: boolean;
+}
+
+/** Build the caller-facing view of a response. Shared by results and incumbents. */
+function readResponse(response: CpSolverResponse): CpSolverResult {
+  return {
+    status: response.status,
+    objectiveValue: response.objectiveValue,
+    bestObjectiveBound: response.bestObjectiveBound,
+    wallTime: response.wallTime,
+    value(variable: IntVar): number {
+      return Number(response.solution[variable.index]);
+    },
+    response,
+  };
 }
 
 /**
@@ -128,12 +182,41 @@ export class CpSolver {
     const paramsPtr = this.module._malloc(paramsBytes.length);
     this.module.HEAPU8.set(paramsBytes, paramsPtr);
 
+    const onSolution = params?.onSolution;
+    if (onSolution) {
+      this.module.__cpsatOnSolution = (bytes) => {
+        onSolution({ ...readResponse(fromBinary(CpSolverResponseSchema, bytes)), live: true });
+      };
+    }
+
     let resultLen: number;
     try {
-      resultLen = this.module._solve(modelPtr, modelBytes.length, paramsPtr, paramsBytes.length);
+      resultLen = this.module._solve(
+        modelPtr,
+        modelBytes.length,
+        paramsPtr,
+        paramsBytes.length,
+        onSolution ? 1 : 0,
+      );
     } finally {
       this.module._free(modelPtr);
       this.module._free(paramsPtr);
+      delete this.module.__cpsatOnSolution;
+    }
+
+    // Incumbents the observer could only record, because it ran on a thread that
+    // cannot enter JS. Drained unconditionally: a live solve recorded nothing, so the
+    // count is zero and this does nothing. That way the 1-vs-many rule lives in one
+    // place — the C++ observer — and is never restated here to drift out of step.
+    if (onSolution) {
+      const recorded = this.module._solution_count();
+      for (let i = 0; i < recorded; i++) {
+        const ptr = this.module._solution_ptr(i);
+        const len = this.module._solution_len(i);
+        // Re-read HEAPU8 each time: growing the heap replaces the buffer.
+        const bytes = this.module.HEAPU8.slice(ptr, ptr + len);
+        onSolution({ ...readResponse(fromBinary(CpSolverResponseSchema, bytes)), live: false });
+      }
     }
 
     // Read result from WASM memory

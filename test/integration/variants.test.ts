@@ -67,4 +67,25 @@ describe('build variants', () => {
     expect(status).toBe(CpSolverStatus.OPTIMAL);
     expect(objective).toBe(220);
   });
+
+  // The clamp decides how solutions are delivered, not just how fast they arrive: one
+  // worker means the observer runs on the calling thread, so the portable build always
+  // reports live — even when the caller asked for eight and would have been replayed
+  // to on the threaded build. This is the browser's case, which has no other coverage.
+  it('portable entry reports solutions live even when eight workers were asked for', async () => {
+    const { CpModel, CpSolver } = await import('../../src/index.portable.js');
+    const model = new CpModel();
+    const take = items.map((_, i) => model.newBoolVar(`take_${i}`));
+    const fold = (which: 0 | 1) =>
+      take.reduce((acc, t, i) => acc.plus(t.times(items[i][which])), take[0].times(0));
+    model.add(fold(1).le(capacity));
+    model.maximize(fold(0));
+
+    const seen: boolean[] = [];
+    const solver = await CpSolver.create();
+    solver.solve(model, { numWorkers: 8, onSolution: (s) => seen.push(s.live) });
+
+    expect(seen.length).toBeGreaterThanOrEqual(1);
+    expect(seen.every((live) => live)).toBe(true);
+  });
 });
