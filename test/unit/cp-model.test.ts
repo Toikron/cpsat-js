@@ -189,6 +189,54 @@ describe('CpModel', () => {
     expect(proto.constraints[0].enforcementLiteral).toEqual([1]);
   });
 
+  it('carries hints into the proto as a partial assignment', () => {
+    const model = new CpModel();
+    const x = model.newIntVar(0, 10, 'x');
+    const b = model.newBoolVar('b');
+    model.newIntVar(0, 10, 'unhinted');
+
+    model.addHint(x, 7);
+    model.addHint(b, 1);
+
+    const hint = model.toProto().solutionHint;
+    expect(hint).toBeDefined();
+    // Partial on purpose: the third variable is not named at all.
+    expect(hint!.vars).toEqual([0, 1]);
+    expect(hint!.values).toEqual([7n, 1n]);
+  });
+
+  it('leaves solutionHint unset when nothing is hinted', () => {
+    const model = new CpModel();
+    model.newIntVar(0, 10, 'x');
+
+    expect(model.toProto().solutionHint).toBeUndefined();
+  });
+
+  // CpModelProto requires the hinted indices to be unique, so a second hint for one
+  // variable has to replace the first rather than append beside it.
+  it('replaces a variable’s hint instead of duplicating it', () => {
+    const model = new CpModel();
+    const x = model.newIntVar(0, 10, 'x');
+
+    model.addHint(x, 3);
+    model.addHint(x, 9);
+
+    const hint = model.toProto().solutionHint;
+    expect(hint!.vars).toEqual([0]);
+    expect(hint!.values).toEqual([9n]);
+  });
+
+  it('clearHints leaves the proto as it was', () => {
+    const model = new CpModel();
+    const x = model.newIntVar(0, 10, 'x');
+
+    model.addHint(x, 7);
+    expect(model.toProto().solutionHint).toBeDefined();
+
+    model.clearHints();
+    expect(model.toProto().solutionHint).toBeUndefined();
+  });
+
   it('serializes to and from binary protobuf', () => {
     const model = new CpModel('test-model');
     const x = model.newIntVar(0, 10, 'x');

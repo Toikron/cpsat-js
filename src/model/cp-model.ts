@@ -12,6 +12,7 @@ import {
   LinearConstraintProtoSchema,
   IntervalConstraintProtoSchema,
   CpObjectiveProtoSchema,
+  PartialVariableAssignmentSchema,
 } from '../generated/cp_model_pb.js';
 import { IntVar, BoolVar, type LinearExprLike } from './int-var.js';
 import { BoundedLinearExpression, toLinearExpr } from './linear-expr.js';
@@ -28,6 +29,15 @@ import { Constraint } from './constraint.js';
  */
 export class CpModel {
   private readonly proto: CpModelProto;
+
+  /**
+   * Hinted values, keyed by variable index.
+   *
+   * A Map rather than the proto's two parallel arrays because CpModelProto requires
+   * the hinted indices to be unique. Keyed this way, hinting one variable twice
+   * cannot be expressed, so it cannot produce an invalid model.
+   */
+  private readonly hints = new Map<number, bigint>();
 
   constructor(name?: string) {
     this.proto = create(CpModelProtoSchema, { name: name ?? '' });
@@ -189,9 +199,40 @@ export class CpModel {
     this.setObjective(expr, true);
   }
 
+  // ── Hints ──
+
+  /**
+   * Suggest a value for a variable, tried before the search proper begins.
+   *
+   * A hint is advisory. It does not constrain anything: a wrong one costs search
+   * time and nothing else, and cannot change the optimal value. So this is a way
+   * to say "start from here", not a way to fix a variable — use `add(v.equals(n))`
+   * for that.
+   *
+   * Hints may be partial, and usually should be. Naming the few variables that
+   * decide a solution lets propagation derive the rest, which is both less work to
+   * build and less to get wrong than spelling out every variable.
+   */
+  addHint(variable: IntVar, value: number | bigint): void {
+    this.hints.set(variable.index, BigInt(value));
+  }
+
+  /** Forget every hint added so far. */
+  clearHints(): void {
+    this.hints.clear();
+  }
+
   // ── Serialization ──
 
   toProto(): CpModelProto {
+    // Materialised here rather than on each addHint so that clearing hints really
+    // does leave the proto as it was, and so repeated calls stay idempotent.
+    this.proto.solutionHint = this.hints.size
+      ? create(PartialVariableAssignmentSchema, {
+          vars: [...this.hints.keys()],
+          values: [...this.hints.values()],
+        })
+      : undefined;
     return this.proto;
   }
 
