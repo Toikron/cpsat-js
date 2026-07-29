@@ -165,6 +165,22 @@ Builder for constraint programming models.
 - `addNoOverlap(intervals): Constraint`
 - `addCircuit(arcs): Constraint`
 - `minimize(expr)` / `maximize(expr)`
+- `addHint(variable, value)` / `clearHints()` — suggest where the search should start
+
+#### Hints
+
+A hint is advisory. It constrains nothing, cannot change the optimal value, and a wrong
+one costs search time and nothing else — use `add(v.equals(n))` to fix a variable.
+
+Hints may be partial, and usually should be: name the variables that decide a solution
+and let propagation derive the rest.
+
+```ts
+// Start from a solution you already have, rather than from nothing.
+previous.forEach((value, i) => model.addHint(take[i], value));
+```
+
+Measured on a track-layout model: 29.0s → 6.1s at 8 workers, hinting a known layout.
 
 ### `IntVar` / `BoolVar`
 
@@ -192,6 +208,35 @@ Expression building methods:
 > composition rather than parallelism, so 8 workers is worth setting even on a single
 > core. The portable build has no threads and clamps this to 1 automatically.
 
+- `onSolution?: (solution: CpSolverSolution) => void` — called for each improving
+  solution found. Observational only: the return value is ignored, and nothing here can
+  steer or stop the search. Bound it with `maxTimeInSeconds`.
+
+#### When `onSolution` fires
+
+`numWorkers` decides the timing, because it decides which thread the search runs on.
+
+| workers | delivery | `live` |
+|---|---|---|
+| 1 (always the portable build) | during the search, before `solve()` returns | `true` |
+| ≥ 6 | recorded during the search, replayed in order just before `solve()` returns | `false` |
+
+At one worker CP-SAT solves on the calling thread, so the callback runs inside the
+solver — keep it quick, and do not call back into the solver from it. Above one worker
+the search runs on threads that cannot enter JS, so incumbents are buffered instead. The
+sequence and its contents are the same kind of thing either way; only the timing differs.
+
+```ts
+solver.solve(model, {
+  numWorkers: 1,
+  onSolution: (s) => console.log(`${s.wallTime.toFixed(1)}s  ${s.objectiveValue}`),
+});
+```
+
+Since `solve()` blocks its thread, a browser wanting to *draw* incumbents as they arrive
+has to run the solve in a Web Worker and post them out; on the main thread the page is
+frozen for the whole search whether or not anything is watching.
+
 ### `CpSolverResult`
 
 - `status: CpSolverStatus` (`UNKNOWN`, `MODEL_INVALID`, `FEASIBLE`, `INFEASIBLE`, `OPTIMAL`)
@@ -201,11 +246,21 @@ Expression building methods:
 - `value(variable): number` — solution value
 - `response: CpSolverResponse` — raw protobuf response
 
+### `CpSolverSolution`
+
+What `onSolution` receives: everything `CpSolverResult` has, including `value()`, plus
+
+- `live: boolean` — delivered during the search, or replayed just before `solve()` returned
+
+The shape is deliberately the same as a final result, so an incumbent and an answer can
+be read by the same code.
+
 ## Architecture
 
 - **TypeScript wrapper** builds a `CpModelProto` via a fluent API
 - **Protobuf serialization** (`@bufbuild/protobuf`) is the JS↔WASM boundary
-- **Single WASM export** — `solve(proto_bytes) → response_bytes`
+- **Single WASM export** — `solve(proto_bytes) → response_bytes`, plus a solution
+  observer that either calls into JS or buffers, depending on the worker count
 - **CP-SAT core** (OR-Tools) runs inside WebAssembly
 
 ## Building from Source
