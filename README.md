@@ -211,6 +211,26 @@ Expression building methods:
 - `onSolution?: (solution: CpSolverSolution) => void` — called for each improving
   solution found. Observational only: the return value is ignored, and nothing here can
   steer or stop the search. Bound it with `maxTimeInSeconds`.
+- `enumerateAllSolutions?: boolean` — report *every* solution rather than stopping at the
+  first. **Only meaningful with no objective:** CP-SAT enumerates only when there is
+  nothing to optimise, so with a `minimize`/`maximize` in the model this does nothing and
+  you get improving solutions as usual. Also disables the presolve reductions that can
+  remove feasible solutions.
+
+  Paired with `onSolution`, this is how you stream a complete solution set as the search
+  finds it. There is no objective, so there is no ordering — the solutions arrive in
+  whatever order the search happens on, and OR-Tools warns against reading anything into
+  that beyond completeness. If you want the stream to be interesting, constrain the model
+  so that every solution is one you would want to see.
+
+  ```ts
+  // Every way to pick two of three, as they are found.
+  solver.solve(model, {
+    numWorkers: 1,
+    enumerateAllSolutions: true,
+    onSolution: (s) => console.log(bits.map((b) => s.value(b)).join('')),
+  });
+  ```
 
 #### When `onSolution` fires
 
