@@ -152,6 +152,47 @@ describe('Solution callbacks', () => {
     expect(result.bestObjectiveBound).toBe(result.objectiveValue);
   });
 
+  // With no objective there is nothing to improve on, so the observer fires once —
+  // unless every solution is asked for, and then it fires for all of them. The count is
+  // exact rather than a lower bound: three booleans summing to two is C(3,2) = 3, and
+  // knowing the number is the whole point of a completeness claim.
+  describe('enumerateAllSolutions', () => {
+    const twoOfThree = () => {
+      const model = new CpModel('two-of-three');
+      const bits = [0, 1, 2].map((i) => model.newBoolVar(`b${i}`));
+      // .toLinearExpr() because LinearExpr.plus will not take a bare IntVar — the
+      // asymmetry tests/library.test.js pins in the consuming project.
+      model.add(bits.reduce((acc, b) => acc.plus(b.toLinearExpr()), bits[0].times(0)).equals(2));
+      return { model, bits };
+    };
+
+    it('reports every solution when asked', () => {
+      const { model, bits } = twoOfThree();
+      const seen: CpSolverSolution[] = [];
+      solver.solve(model, {
+        numWorkers: 1,
+        enumerateAllSolutions: true,
+        onSolution: (s) => seen.push(s),
+      });
+
+      expect(seen).toHaveLength(3);
+      // All three, each distinct, each genuinely satisfying the constraint.
+      const assignments = seen.map((s) => bits.map((b) => s.value(b)).join(''));
+      expect(new Set(assignments).size).toBe(3);
+      for (const s of seen) {
+        expect(bits.reduce((n, b) => n + s.value(b), 0)).toBe(2);
+      }
+    });
+
+    it('reports one solution when not asked', () => {
+      const { model } = twoOfThree();
+      const seen: CpSolverSolution[] = [];
+      solver.solve(model, { numWorkers: 1, onSolution: (s) => seen.push(s) });
+
+      expect(seen).toHaveLength(1);
+    });
+  });
+
   it('does not fire when there is nothing to report', () => {
     const model = new CpModel();
     const x = model.newIntVar(0, 10, 'x');

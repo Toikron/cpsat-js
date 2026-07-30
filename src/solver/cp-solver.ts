@@ -70,6 +70,22 @@ export interface SolverParams {
    */
   numWorkers?: number;
   /**
+   * Report every solution rather than stopping at the first.
+   *
+   * **Only meaningful on a model with no objective.** CP-SAT's own wording is "whether
+   * we enumerate all solutions of a problem without objective"; with an objective the
+   * search reports improving solutions instead, and this does nothing for you.
+   *
+   * Combined with `onSolution` this is what streams a complete solution set as the
+   * search finds it. The solutions arrive in whatever order the search happens on —
+   * there is no objective, so there is no ordering — and OR-Tools warns against reading
+   * anything into it beyond completeness.
+   *
+   * Setting this also disables the presolve reductions that can remove feasible
+   * solutions, which is the same effect as `keep_all_feasible_solutions_in_presolve`.
+   */
+  enumerateAllSolutions?: boolean;
+  /**
    * Called for each improving solution the search finds.
    *
    * Purely observational: the return value is ignored and nothing here can steer or
@@ -166,6 +182,9 @@ export class CpSolver {
     }
     if (params?.numWorkers !== undefined) {
       satParams.numWorkers = params.numWorkers;
+    }
+    if (params?.enumerateAllSolutions !== undefined) {
+      satParams.enumerateAllSolutions = params.enumerateAllSolutions;
     }
     // The portable build has no threads. Clamp to 1 rather than to some lower count:
     // anything in 2..5 selects a degraded portfolio and is slower than a single worker.
