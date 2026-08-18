@@ -111,6 +111,26 @@ describe('CpModel', () => {
     expect(proto.constraints[0].constraint.case).toBe('boolAnd');
   });
 
+  it('adds native Boolean cardinality constraints', () => {
+    const model = new CpModel();
+    const a = model.newBoolVar('a');
+    const b = model.newBoolVar('b');
+    const c = model.newBoolVar('c');
+
+    model.addAtMostOne([a, b, c]);
+    model.addExactlyOne([a, b, c]);
+
+    const proto = model.toProto();
+    expect(proto.constraints[0].constraint.case).toBe('atMostOne');
+    expect(proto.constraints[1].constraint.case).toBe('exactlyOne');
+    if (proto.constraints[0].constraint.case === 'atMostOne') {
+      expect(proto.constraints[0].constraint.value.literals).toEqual([0, 1, 2]);
+    }
+    if (proto.constraints[1].constraint.case === 'exactlyOne') {
+      expect(proto.constraints[1].constraint.value.literals).toEqual([0, 1, 2]);
+    }
+  });
+
   it('adds noOverlap constraints with intervals', () => {
     const model = new CpModel();
     const s1 = model.newIntVar(0, 10, 's1');

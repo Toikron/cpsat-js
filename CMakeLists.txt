@@ -54,7 +54,7 @@ set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
   or-tools
   GIT_REPOSITORY https://github.com/google/or-tools.git
-  GIT_TAG        v9.12
+  GIT_TAG        v9.15
   GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(or-tools)

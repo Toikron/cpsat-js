@@ -1,0 +1,62 @@
+name: Build and test WASM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-wasm:
+    name: build-${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [threaded, portable]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg CPSAT_VARIANT=${{ matrix.variant }} -t cpsat-js-wasm-${{ matrix.variant }} .
+      - name: Extract ${{ matrix.variant }} WASM
+        run: |
+          id=$(docker create cpsat-js-wasm-${{ matrix.variant }})
+          mkdir -p build/${{ matrix.variant }}
+          docker cp "$id:/output/build/${{ matrix.variant }}/." build/${{ matrix.variant }}
+          docker rm "$id"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpsat-js-wasm-${{ matrix.variant }}
+          path: build/${{ matrix.variant }}/
+
+  package:
+    needs: build-wasm
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:proto && npm run build:ts
+      - uses: actions/download-artifact@v4
+        with:
+          name: cpsat-js-wasm-threaded
+          path: build/threaded
+      - uses: actions/download-artifact@v4
+        with:
+          name: cpsat-js-wasm-portable
+          path: build/portable
+      - run: npm test
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpsat-js-ortools-9.15
+          path: |
+            cpsat-js-*.tgz
+            build/threaded/cpsat.mjs
+            build/threaded/cpsat.wasm
+            build/portable/cpsat.mjs
+            build/portable/cpsat.wasm
