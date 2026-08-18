@@ -24,7 +24,7 @@ echo "=== Stage 1: Configure with Emscripten ==="
 emcmake cmake -B "$BUILD_DIR" -S . \
   -DCMAKE_BUILD_TYPE=Release \
   -DCPSAT_THREADS="$THREADS" \
-  -DOR_TOOLS_PROTOC_EXECUTABLE=/usr/bin/protoc \
+  -DOR_TOOLS_PROTOC_EXECUTABLE=/usr/local/bin/protoc \
   -G Ninja
 
 echo "=== Stage 2: Patch build.ninja for cross-compilation ==="

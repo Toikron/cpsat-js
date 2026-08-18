@@ -1,10 +1,17 @@
 FROM emscripten/emsdk:3.1.73
 
 ARG CPSAT_VARIANT=both
+ARG PROTOC_VERSION=33.1
+ARG PROTOC_SHA256=f3340e28a83d1c637d8bafdeed92b9f7db6a384c26bca880a6e5217b40a4328b
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ninja-build protobuf-compiler python3-pip \
+    ca-certificates curl ninja-build python3-pip unzip \
     && python3 -m pip install --no-cache-dir 'cmake>=3.24,<4' \
+    && curl -fsSL -o /tmp/protoc.zip \
+      "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-x86_64.zip" \
+    && echo "${PROTOC_SHA256}  /tmp/protoc.zip" | sha256sum -c - \
+    && unzip -q /tmp/protoc.zip -d /usr/local \
+    && rm /tmp/protoc.zip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
