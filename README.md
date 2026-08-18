@@ -199,7 +199,16 @@ Expression building methods:
 
 - `maxTimeInSeconds?: number` — wall-clock limit. On timeout you get `FEASIBLE` (best
   solution found) or `UNKNOWN` (none found yet), never a throw.
+- `randomSeed?: number` — native CP-SAT search seed.
+- `stopAfterFirstSolution?: boolean` — stop natively after the first complete feasible
+  solution. Use this for feasibility, not for a quality optimization pass.
 - `numWorkers?: number` — parallel subsolvers, default `8`.
+- `numFullSubsolvers?: number` and `subsolvers?: string[]` — control the native
+  full-problem portfolio.
+- `sharedTreeNumWorkers?: number` — split one native search tree across complete workers.
+- `sharedTreeOpenLeavesPerWorker`, `sharedTreeMaxNodesPerWorker`,
+  `sharedTreeSplitStrategy`, `sharedTreeWorkerMinRestartsPerSubtree`, and
+  `sharedTreeSplitMinDtime` tune its work queue and split policy.
 
 > **Use `1` or `>= 6`, never in between.** `num_workers` selects *which* subsolver
 > portfolio CP-SAT runs, not just how much parallelism it gets. Below 6 it runs a
@@ -282,6 +291,8 @@ be read by the same code.
 - **Single WASM export** — `solve(proto_bytes) → response_bytes`, plus a solution
   observer that either calls into JS or buffers, depending on the worker count
 - **CP-SAT core** (OR-Tools) runs inside WebAssembly
+- **OR-Tools 9.15** supplies the current shared-tree, bound-sharing, and clause-sharing
+  implementation.
 
 ## Building from Source
 

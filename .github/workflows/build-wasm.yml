@@ -1,0 +1,37 @@
+name: Build and test WASM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:proto && npm run build:ts
+      - run: docker build --build-arg CPSAT_VARIANT=both -t cpsat-js-wasm .
+      - name: Extract WASM variants
+        run: |
+          id=$(docker create cpsat-js-wasm)
+          docker cp "$id:/output/build" ./build
+          docker rm "$id"
+      - run: npm test
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpsat-js-ortools-9.15
+          path: |
+            cpsat-js-*.tgz
+            build/threaded/cpsat.mjs
+            build/threaded/cpsat.wasm
+            build/portable/cpsat.mjs
+            build/portable/cpsat.wasm

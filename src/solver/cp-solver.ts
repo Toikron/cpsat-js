@@ -61,6 +61,10 @@ export function setGlueLoader(loader: GlueLoader, threaded: boolean): void {
 
 export interface SolverParams {
   maxTimeInSeconds?: number;
+  /** Deterministic CP-SAT search seed. */
+  randomSeed?: number;
+  /** Stop natively after the first complete feasible solution. */
+  stopAfterFirstSolution?: boolean;
   /**
    * Number of parallel subsolvers. Defaults to 8.
    *
@@ -69,6 +73,22 @@ export interface SolverParams {
    * than 1 on real models. Use 1 or >= 6, never in between.
    */
   numWorkers?: number;
+  /** Number of full-problem portfolio subsolvers. */
+  numFullSubsolvers?: number;
+  /** Ordered full-problem subsolver names. */
+  subsolvers?: string[];
+  /** Number of workers exploring one shared search tree. */
+  sharedTreeNumWorkers?: number;
+  /** Open shared-tree leaves maintained per worker. */
+  sharedTreeOpenLeavesPerWorker?: number;
+  /** Shared-tree node budget per worker. */
+  sharedTreeMaxNodesPerWorker?: number;
+  /** Native shared-tree split strategy enum. */
+  sharedTreeSplitStrategy?: number;
+  /** Restarts before replacing an unproductive subtree. */
+  sharedTreeWorkerMinRestartsPerSubtree?: number;
+  /** Deterministic time between split proposals. */
+  sharedTreeSplitMinDtime?: number;
   /**
    * Report every solution rather than stopping at the first.
    *
@@ -180,8 +200,39 @@ export class CpSolver {
     if (params?.maxTimeInSeconds !== undefined) {
       satParams.maxTimeInSeconds = params.maxTimeInSeconds;
     }
+    if (params?.randomSeed !== undefined) {
+      satParams.randomSeed = params.randomSeed;
+    }
+    if (params?.stopAfterFirstSolution !== undefined) {
+      satParams.stopAfterFirstSolution = params.stopAfterFirstSolution;
+    }
     if (params?.numWorkers !== undefined) {
       satParams.numWorkers = params.numWorkers;
+    }
+    if (params?.numFullSubsolvers !== undefined) {
+      satParams.numFullSubsolvers = params.numFullSubsolvers;
+    }
+    if (params?.subsolvers !== undefined) {
+      satParams.subsolvers = [...params.subsolvers];
+    }
+    if (params?.sharedTreeNumWorkers !== undefined) {
+      satParams.sharedTreeNumWorkers = params.sharedTreeNumWorkers;
+    }
+    if (params?.sharedTreeOpenLeavesPerWorker !== undefined) {
+      satParams.sharedTreeOpenLeavesPerWorker = params.sharedTreeOpenLeavesPerWorker;
+    }
+    if (params?.sharedTreeMaxNodesPerWorker !== undefined) {
+      satParams.sharedTreeMaxNodesPerWorker = params.sharedTreeMaxNodesPerWorker;
+    }
+    if (params?.sharedTreeSplitStrategy !== undefined) {
+      satParams.sharedTreeSplitStrategy = params.sharedTreeSplitStrategy;
+    }
+    if (params?.sharedTreeWorkerMinRestartsPerSubtree !== undefined) {
+      satParams.sharedTreeWorkerMinRestartsPerSubtree =
+        params.sharedTreeWorkerMinRestartsPerSubtree;
+    }
+    if (params?.sharedTreeSplitMinDtime !== undefined) {
+      satParams.sharedTreeSplitMinDtime = params.sharedTreeSplitMinDtime;
     }
     if (params?.enumerateAllSolutions !== undefined) {
       satParams.enumerateAllSolutions = params.enumerateAllSolutions;

@@ -1,5 +1,7 @@
 FROM emscripten/emsdk:3.1.73
 
+ARG CPSAT_VARIANT=both
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     && rm -rf /var/lib/apt/lists/*
@@ -10,7 +12,7 @@ WORKDIR /src
 COPY CMakeLists.txt build.sh ./
 COPY src/cpp/ src/cpp/
 
-RUN ./build.sh
+RUN ./build.sh "$CPSAT_VARIANT"
 
 # Copy output for extraction
-RUN mkdir -p /output && cp build/cpsat.mjs build/cpsat.wasm /output/
+RUN mkdir -p /output/build && cp -R build/threaded build/portable /output/build/
