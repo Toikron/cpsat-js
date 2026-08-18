@@ -15,5 +15,6 @@ COPY src/cpp/ src/cpp/
 
 RUN ./build.sh "$CPSAT_VARIANT"
 
-# Copy output for extraction
-RUN mkdir -p /output/build && cp -R build/threaded build/portable /output/build/
+# Copy whichever variant this image built. Matrix CI builds the two variants in
+# parallel, while local `CPSAT_VARIANT=both` still stages both directories.
+RUN mkdir -p /output/build && cp -R build/* /output/build/
