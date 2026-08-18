@@ -161,6 +161,30 @@ export class CpModel {
     return new Constraint(ct);
   }
 
+  /** Require at most one literal to be true using CP-SAT's native cardinality encoding. */
+  addAtMostOne(literals: (BoolVar | IntVar | number)[]): Constraint {
+    const ct = this.addConstraintProto();
+    ct.constraint = {
+      case: 'atMostOne',
+      value: create(BoolArgumentProtoSchema, {
+        literals: literals.map((lit) => (typeof lit === 'number' ? lit : lit.index)),
+      }),
+    };
+    return new Constraint(ct);
+  }
+
+  /** Require exactly one literal to be true using CP-SAT's native cardinality encoding. */
+  addExactlyOne(literals: (BoolVar | IntVar | number)[]): Constraint {
+    const ct = this.addConstraintProto();
+    ct.constraint = {
+      case: 'exactlyOne',
+      value: create(BoolArgumentProtoSchema, {
+        literals: literals.map((lit) => (typeof lit === 'number' ? lit : lit.index)),
+      }),
+    };
+    return new Constraint(ct);
+  }
+
   addNoOverlap(intervals: IntervalVar[]): Constraint {
     const ct = this.addConstraintProto();
     ct.constraint = {

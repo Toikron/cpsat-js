@@ -87,6 +87,7 @@ if (result.status === CpSolverStatus.OPTIMAL) {
 - Linear constraints (`add(expr.le(val))`, `add(expr.ge(val))`, `add(expr.equals(val))`)
 - `addAllDifferent([...vars])` — forces all variables to take distinct values
 - `addBoolOr([...literals])` / `addBoolAnd([...literals])` — boolean logic
+- `addAtMostOne([...literals])` / `addExactlyOne([...literals])` — native Boolean cardinality
 - `addNoOverlap([...intervals])` — scheduling / disjunctive constraints
 - `addCircuit([[tail, head, literal], ...])` — routing / TSP
 - `minimize(expr)` / `maximize(expr)` — optimization objectives
@@ -162,6 +163,8 @@ Builder for constraint programming models.
 - `addAllDifferent(vars): Constraint`
 - `addBoolOr(literals): Constraint`
 - `addBoolAnd(literals): Constraint`
+- `addAtMostOne(literals): Constraint`
+- `addExactlyOne(literals): Constraint`
 - `addNoOverlap(intervals): Constraint`
 - `addCircuit(arcs): Constraint`
 - `minimize(expr)` / `maximize(expr)`
