@@ -3,7 +3,8 @@ FROM emscripten/emsdk:3.1.73
 ARG CPSAT_VARIANT=both
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ninja-build \
+    ninja-build python3-pip \
+    && python3 -m pip install --no-cache-dir 'cmake>=3.24,<4' \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
